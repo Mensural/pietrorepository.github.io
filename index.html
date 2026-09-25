@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a73e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Turni CA">
+  <title>Turnistica Continuità Assistenziale</title>
+  
+  <!-- Font Google 'Inter' Material Design 3 -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- CDN per Esportazione PDF ed Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+</head>
+<body>
+
+  <!-- Loading Overlay -->
+  <div id="loader" class="loader-overlay">
+    <div class="spinner"></div>
+    <p id="loaderText" style="margin-top: 0.8rem; font-weight: 600; font-size: 0.85rem; color: var(--text);">Elaborazione in corso...</p>
+  </div>
+
+  <header>
+    <!-- ========================================== -->
+    <!-- TOOLBAR COMPATTA: 3 ELEMENTI ESSENZIALI    -->
+    <!-- ========================================== -->
+    <div class="archive-toolbar">
+    
+        <!-- 1. Dropdown Archivio Flottante -->
+        <div class="dropdown-wrapper">
+        <button type="button" class="btn btn-secondary" id="btn-menu-archivio" style="height: 24px; padding: 2px 8px; font-size: 0.74rem;">
+            📁 Archivio <span style="font-size: 0.65rem; margin-left: 2px;">▾</span>
+        </button>
+        
+        <div id="dropdown-archivio" class="dropdown-panel hidden">
+            <div class="dropdown-item primary-action" id="dropdown-nuovo-mese">
+            <span>➕ Crea Nuovo Mese</span>
+            </div>
+            <div class="dropdown-divider"></div>
+            <div id="dropdown-lista-mesi" class="dropdown-list">
+            <!-- Generato dinamicamente in JS -->
+            </div>
+        </div>
+        </div>
+    
+        <!-- 2. Esporta Backup Globale -->
+        <button type="button" class="btn btn-secondary" id="btn-export-globale" style="height: 24px; padding: 2px 8px; font-size: 0.74rem;" title="Scarica l'intero database in JSON">
+        💾 Backup Globale
+        </button>
+    
+        <!-- 3. Ripristina Backup Globale -->
+        <button type="button" class="btn btn-secondary" id="btn-import-globale" style="height: 24px; padding: 2px 8px; font-size: 0.74rem;" title="Ripristina backup completo da file JSON">
+        📂 Ripristina Backup
+        </button>
+        
+        <!-- Input File Nascosti per FileReader -->
+        <input type="file" id="fileImportBackupGlobale" accept=".json" style="display: none;">
+        <input type="file" id="fileImportSingoloMeseTarget" accept=".json" style="display: none;">
+    </div>
+    <div class="brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+      Turnistica Continuità Assistenziale
+    </div>
+    <div id="headerMonthLabel" style="font-weight: 600; font-size: 0.8rem; color: var(--text-muted);">Configurazione Mese</div>
+  </header>
+
+  <div class="container">
+    <!-- Stepper Bar -->
+    <div class="stepper">
+      <div class="step-item active" id="step-nav-1">1. Setup</div>
+      <div class="step-item" id="step-nav-2">2. Medici & Indisponibilità</div>
+      <div class="step-item" id="step-nav-3">3. Master Grid (Calendario)</div>
+      <div class="step-item" id="step-nav-4">4. Calendario Finale & Stats</div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- FASE 1: SETUP CALENDARIO                   -->
+    <!-- ========================================== -->
+    <div id="phase-1" class="phase-container" style="justify-content: center; align-items: center;">
+      <div class="card" style="width: 100%; max-width: 460px; padding: 1.25rem;">
+        <h2 class="card-title">Fase 1: Configurazione Periodo</h2>
+        
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="anno">Anno</label>
+            <input type="number" id="anno" min="2020" max="2050">
+          </div>
+          <div class="form-group">
+            <label for="mese">Mese</label>
+            <select id="mese">
+              <option value="" disabled selected>Seleziona un mese...</option>
+              <option value="0">Gennaio</option>
+              <option value="1">Febbraio</option>
+              <option value="2">Marzo</option>
+              <option value="3">Aprile</option>
+              <option value="4">Maggio</option>
+              <option value="5">Giugno</option>
+              <option value="6">Luglio</option>
+              <option value="7">Agosto</option>
+              <option value="8">Settembre</option>
+              <option value="9">Ottobre</option>
+              <option value="10">Novembre</option>
+              <option value="11">Dicembre</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="festivita">Festività Straordinarie (gg/mm opzionali separati da virgola)</label>
+          <input type="text" id="festivita" placeholder="es. 25/04, 01/05">
+          <small style="color: var(--text-muted); font-size: 0.68rem;">I giorni indicati avranno doppio turno (Diurno + Notturno) come i weekend.</small>
+        </div>
+
+        <button type="button" class="btn btn-primary" id="btnStartConfig" style="width: 100%; margin-top: 0.75rem; height: 32px;">
+          Inizia Configurazione Medici →
+        </button>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- FASE 2: GESTIONE MEDICI & INDISPONIBILITÀ  -->
+    <!-- ========================================== -->
+    <div id="phase-2" class="phase-container hidden">
+      <div class="grid-2" style="height: 100%;">
+        
+        <!-- Form Inserimento Medico -->
+        <div class="card" style="display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0;">
+          <div class="card-title">
+            <span id="formDoctorTitle">A) Inserimento Medico</span>
+            <button type="button" class="btn btn-secondary" id="btnNewDoctor" style="font-size: 0.68rem; padding: 2px 6px; height: 20px;">Nuovo</button>
+          </div>
+
+          <div id="previewNoticeBanner" class="info-banner hidden">
+            <span>👁️ <strong>Anteprima Attiva:</strong> visualizzazione indisponibilità.</span>
+            <button type="button" class="btn btn-secondary" id="btnExitPreview" style="padding: 1px 5px; font-size: 0.65rem; height: 18px;">Esci</button>
+          </div>
+
+          <form id="doctorForm" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+            <input type="hidden" id="docEditId" value="">
+            <div class="grid-2">
+              <div class="form-group">
+                <label for="docNome">Nome</label>
+                <input type="text" id="docNome" required placeholder="Nome...">
+              </div>
+              <div class="form-group">
+                <label for="docCognome">Cognome</label>
+                <input type="text" id="docCognome" required placeholder="Cognome...">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="docTarget">Target Turni Mensili</label>
+              <input type="number" id="docTarget" min="1" max="31" value="8" required placeholder="Es. 8">
+            </div>
+
+            <label style="margin-top: 2px; display:block; font-size: 0.7rem;">Indisponibilità Mensili (Clicca per marcare in rosso):</label>
+            <div style="flex: 1; overflow-y: auto; min-height: 0;">
+              <div id="unavailabilityPicker" class="month-picker-grid"></div>
+            </div>
+
+            <div class="flex-end" style="margin-top: 6px;">
+              <button type="button" class="btn btn-secondary" id="btnResetDoctorForm" style="height: 26px;">Pulisci</button>
+              <button type="submit" class="btn btn-primary" id="btnSaveDoctor" style="height: 26px;">Salva Medico</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Importazione & Tabella Organico -->
+        <div style="display: flex; flex-direction: column; height: 100%; min-height: 0;">
+          <div class="card" style="flex-shrink: 0;">
+            <h2 class="card-title">B) Importazione Veloce CSV</h2>
+            <div class="form-group">
+              <label for="csvFileInput">File Locale CSV (Compatibile con Google Forms)</label>
+              <input type="file" id="csvFileInput" accept=".csv" style="height: 28px; padding: 2px 4px; font-size: 0.74rem;">
+            </div>
+            <div class="flex-row" style="margin-top: 5px;">
+              <button type="button" class="btn btn-secondary" id="btnDownloadTemplate" style="font-size: 0.68rem; padding: 2px 6px; height: 22px;">Template CSV</button>
+              <button type="button" class="btn btn-secondary" id="btnLoadDemo" style="font-size: 0.68rem; padding: 2px 6px; height: 22px;">Dati Demo</button>
+            </div>
+          </div>
+
+          <div class="card" style="flex: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: 4px;">
+            <div class="card-title">
+              <span>Organico Medici (<span id="doctorCounter">0</span>)</span>
+              <button type="button" class="btn btn-danger" id="btnClearAllDoctors" style="padding: 1px 6px; font-size: 0.66rem; height: 20px;">Svuota</button>
+            </div>
+            <div class="table-container" style="flex: 1; overflow-y: auto; min-height: 0;">
+              <table id="doctorsTable">
+                <thead>
+                  <tr>
+                    <th>Nominativo</th>
+                    <th>Target</th>
+                    <th>Indisponibilità</th>
+                    <th>Azioni</th>
+                  </tr>
+                </thead>
+                <tbody id="doctorsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="flex-end" style="margin-top: 2px;">
+            <button type="button" class="btn btn-secondary" id="btnStep2Back" style="height: 26px;">← Setup</button>
+            <button type="button" class="btn btn-primary btn-lg" id="btnStep2Next" style="height: 26px;">Procedi a Master Grid (Fase 3) →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- FASE 3: MASTER GRID - CALENDARIO MENSILE   -->
+    <!-- ========================================== -->
+    <div id="phase-3" class="phase-container hidden">
+      <div class="card" style="flex: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: 0;">
+        <div class="card-title">
+          <span>Master Grid - Anteprima Mensile delle Indisponibilità</span>
+          <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px;">
+            <!-- FILTRO MEDICO FASE 3 -->
+            <select id="filtroMedicoFase3" class="filter-select" title="Filtra visualizzazione per medico">
+              <option value="">Tutti i medici</option>
+            </select>
+            <button type="button" class="btn btn-success" id="btnGenerateShifts" style="font-size: 0.74rem; padding: 3px 10px; height: 24px;">
+              ⚡ GENERA TURNI DEFINITIVI
+            </button>
+            <span class="badge badge-info" id="gridCapacityStats">Analisi Fabbisogno...</span>
+          </div>
+        </div>
+
+        <div class="calendar-container">
+          <div class="calendar-days-header">
+            <div class="cal-day-title">Lunedì</div>
+            <div class="cal-day-title">Martedì</div>
+            <div class="cal-day-title">Mercoledì</div>
+            <div class="cal-day-title">Giovedì</div>
+            <div class="cal-day-title">Venerdì</div>
+            <div class="cal-day-title">Sabato</div>
+            <div class="cal-day-title">Domenica</div>
+          </div>
+          <div id="masterCalendarGrid" class="calendar-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- FASE 4: CALENDARIO FINALE, OVERRIDE & STATS-->
+    <!-- ========================================== -->
+    <div id="phase-4" class="phase-container hidden">
+      
+      <!-- WRAPPER UNIFICATO PER ESPORTAZIONE PDF (STATISTICHE + TABELLONE) -->
+      <div id="pdf-export-container" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+        
+        <!-- Header Esclusivo PDF -->
+        <div class="pdf-header-container" id="pdfHeaderBox">
+          <h2 id="pdfHeaderTitle">Turnistica Continuità Assistenziale</h2>
+          <p id="pdfHeaderSubtitle">Prospetto Turni Mensile con Riepilogo Statistiche</p>
+        </div>
+
+        <!-- Sezione Statistiche di Riepilogo -->
+        <div class="card" id="statsCard" style="padding: 4px 8px; flex-shrink: 0;">
+          <div class="stats-horizontal-bar">
+            <span style="font-weight: 700; font-size: 0.78rem; color: #0f172a;">Statistiche:</span>
+            <div style="display: flex; gap: 6px; align-items: center;" id="topLevelMetrics">
+              <span class="stat-badge">Copertura: <strong id="statCoveredPct">0%</strong></span>
+              <span class="stat-badge">Scoperti: <strong id="statUncoveredCount">0</strong></span>
+              <span class="stat-badge">Medici: <strong id="statDoctorsCount">0</strong></span>
+            </div>
+            <button type="button" class="btn btn-secondary no-pdf-export" id="btnToggleStats" style="font-size: 0.66rem; padding: 1px 6px; height: 20px;">
+              <span id="btnToggleStatsText">Dettagli Medici ▾</span>
+            </button>
+          </div>
+
+          <div class="table-container hidden" id="detailedStatsTableWrapper" style="max-height: 90px; margin-top: 4px;">
+            <table id="statsTable">
+              <thead>
+                <tr>
+                  <th>Medico</th>
+                  <th>Target</th>
+                  <th>Assegnati</th>
+                  <th>Delta</th>
+                  <th>Target WE</th>
+                  <th>Assegnati WE</th>
+                  <th>Delta WE</th>
+                  <th>Stato</th>
+                </tr>
+              </thead>
+              <tbody id="statsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Sezione Tabellone Calendario Finale -->
+        <div class="card" id="exportScheduleArea" style="flex: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: 0;">
+          <div class="card-title no-pdf-export" style="margin-bottom: 3px;">
+            <span id="scheduleMainTitle" style="font-size: 0.84rem;">Tabellone Turni Finale</span>
+            <div class="flex-row">
+              <!-- FILTRO MEDICO FASE 4 -->
+              <select id="filtroMedicoFase4" class="filter-select" title="Filtra visualizzazione per medico">
+                <option value="">Tutti i medici</option>
+              </select>
+              <button type="button" class="btn btn-secondary" id="btnExportExcel" style="font-size: 0.68rem; padding: 2px 6px; height: 22px;">📊 Excel</button>
+              <button type="button" class="btn btn-secondary" id="btnExportPdf" style="font-size: 0.68rem; padding: 2px 6px; height: 22px;">📄 PDF</button>
+              <button type="button" class="btn btn-secondary" id="btn-export-ics" style="font-size: 0.68rem; padding: 2px 6px; height: 22px;">📅 Esporta Calendario (.ics)</button>
+              <button type="button" class="btn btn-primary" id="btnRegenerate" style="font-size: 0.68rem; padding: 2px 6px; height: 22px;">🔄 Rigenera</button>
+              <button type="button" class="btn btn-secondary" id="btnStep4Back" style="font-size: 0.68rem; padding: 2px 6px; height: 22px;">← Anteprima</button>
+            </div>
+          </div>
+
+          <div class="calendar-container" id="finalCalendarContainer">
+            <div class="calendar-days-header">
+              <div class="cal-day-title">Lunedì</div>
+              <div class="cal-day-title">Martedì</div>
+              <div class="cal-day-title">Mercoledì</div>
+              <div class="cal-day-title">Giovedì</div>
+              <div class="cal-day-title">Venerdì</div>
+              <div class="cal-day-title">Sabato</div>
+              <div class="cal-day-title">Domenica</div>
+            </div>
+            <div id="finalCalendarGrid" class="calendar-grid"></div>
+          </div>
+        </div>
+
+      </div> <!-- Fine #pdf-export-container -->
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT ENGINE (ALGORITMO CSP OTTIMIZZATO & FILTRI DINAMICI) -->
+  <script src="app.js"></script>
+  
+  <script>
+  // Registrazione del Service Worker per supporto PWA e funzionamento offline
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then((reg) => console.log('PWA Service Worker registrato con successo:', reg.scope))
+        .catch((err) => console.warn('Registrazione Service Worker fallita:', err));
+    });
+  }
+</script>
+</body>
+</html>
